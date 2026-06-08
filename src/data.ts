@@ -8,12 +8,16 @@ import type {
   TicketDefinition,
 } from "./types";
 
+function assetPath(path: string) {
+  return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
+}
+
 export const mates: Record<MateId, MateProfile> = {
   waniyan: {
     id: "waniyan",
     name: "ワニやん",
     emoji: "🐊",
-    imageSrc: "/mates/waniyan.png",
+    imageSrc: assetPath("mates/waniyan.png"),
     role: "整える担当",
     note: "全部やらんでええ。1個やったら勝ちや。",
     accent: "#69a77d",
@@ -26,7 +30,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "kumaru",
     name: "くまる",
     emoji: "🐻",
-    imageSrc: "/mates/kumaru.png",
+    imageSrc: assetPath("mates/kumaru.png"),
     role: "暮らす担当",
     note: "暮らしをゆっくり回してくれる。",
     accent: "#b88958",
@@ -39,7 +43,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "shibatarou",
     name: "しばたろう",
     emoji: "🐕",
-    imageSrc: "/mates/shibatarou.png",
+    imageSrc: assetPath("mates/shibatarou.png"),
     role: "働く担当",
     note: "現実を一緒に1個だけ見に行く相棒。",
     accent: "#e49a3f",
@@ -52,7 +56,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "fukurou",
     name: "ホウ先生",
     emoji: "🦉",
-    imageSrc: "/mates/fukurou.png",
+    imageSrc: assetPath("mates/fukurou.png"),
     role: "学ぶ担当",
     note: "わからない場所を見つけるのも前進です。",
     accent: "#7f8fb0",
@@ -65,7 +69,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "nekosenpai",
     name: "ミケ先輩",
     emoji: "🐈",
-    imageSrc: "/mates/nekosenpai.png",
+    imageSrc: assetPath("mates/nekosenpai.png"),
     role: "書く担当",
     note: "下書きでいいの。まず1行置きなさい。",
     accent: "#d9939b",
@@ -78,7 +82,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "piyori",
     name: "ピヨリ",
     emoji: "🐦",
-    imageSrc: "/mates/piyori.png",
+    imageSrc: assetPath("mates/piyori.png"),
     role: "つくる担当",
     note: "完成より、まず触ってみるぴよ〜。",
     accent: "#e7bf4f",
@@ -91,7 +95,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "azamaru",
     name: "あざまる",
     emoji: "🦭",
-    imageSrc: "/mates/azamaru.png",
+    imageSrc: assetPath("mates/azamaru.png"),
     role: "ととのう担当",
     note: "休むのもクエストまる。",
     accent: "#95b8c8",
@@ -104,7 +108,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "usamaru",
     name: "うさ丸",
     emoji: "🐰",
-    imageSrc: "/mates/usamaru.png",
+    imageSrc: assetPath("mates/usamaru.png"),
     role: "チュートリアル担当",
     note: "はじめての操作を明るく案内する。",
     accent: "#e7ad62",
@@ -117,7 +121,7 @@ export const mates: Record<MateId, MateProfile> = {
     id: "kamekichi",
     name: "かめ吉",
     emoji: "🐢",
-    imageSrc: "/mates/kamekichi.png",
+    imageSrc: assetPath("mates/kamekichi.png"),
     role: "ページ案内担当",
     note: "クエスト、チケット、達成画面をゆっくり案内する。",
     accent: "#7eb6b2",
@@ -322,6 +326,8 @@ export const comments: MateComment[] = [
   { id: "mono-piyori", mateId: "piyori", category: "creative", trigger: "app_open", postType: "mate_monologue", text: "完成じゃなくて、ちょっとつくるだけでいいぴよ〜。" },
   { id: "mono-aza", mateId: "azamaru", category: "care", trigger: "app_open", postType: "mate_monologue", text: "水を飲むだけでも、体はととのうまる。" },
   { id: "mono-usamaru", mateId: "usamaru", trigger: "app_open", postType: "mate_monologue", text: "迷ったら3分からでOK！ここから始めよ！" },
+  { id: "mono-usamaru-2", mateId: "usamaru", trigger: "app_open", postType: "mate_monologue", text: "最初はうさ丸だけ見てればOK！まずはここを押してみよう！" },
+  { id: "mono-usamaru-3", mateId: "usamaru", trigger: "app_open", postType: "mate_monologue", text: "わからなくても大丈夫！1回やってみたら、もうチュートリアル達成だよ！" },
   { id: "mono-kame", mateId: "kamekichi", trigger: "app_open", postType: "mate_monologue", text: "クエストもチケットも、ゆっくり見ていけばええよぉ。" },
 
   { id: "start-wani-1", mateId: "waniyan", category: "organize", trigger: "task_start", postType: "mate_reply", text: "全部やらんでええ。床のもん1個拾ったら勝ちや。" },
