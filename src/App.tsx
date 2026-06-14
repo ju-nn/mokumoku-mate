@@ -428,11 +428,13 @@ function itemMatchesReplyTarget(comment: MateComment, replyToMateId: MateId) {
 }
 
 function mateReplyCount(trigger: MateComment["trigger"], category?: TaskCategory) {
-  if (trigger === "task_start") return Math.random() > 0.55 ? 2 : 1;
-  if (trigger === "progress") return Math.random() > 0.7 ? 2 : 1;
-  if (trigger === "complete" || trigger === "partial") return Math.random() > 0.65 ? 2 : 1;
-  if (category && Math.random() > 0.65) return 2;
-  return 1;
+  if (trigger === "task_start") return Math.random() < 0.32 ? 1 : 0;
+  if (trigger === "progress") return Math.random() < 0.24 ? 1 : 0;
+  if (trigger === "complete") return Math.random() < 0.68 ? 1 : 0;
+  if (trigger === "partial") return Math.random() < 0.56 ? 1 : 0;
+  if (trigger === "interrupted") return Math.random() < 0.46 ? 1 : 0;
+  if (category && Math.random() < 0.08) return 2;
+  return Math.random() < 0.34 ? 1 : 0;
 }
 
 function plannedMateReplyCount(
@@ -443,9 +445,13 @@ function plannedMateReplyCount(
 ) {
   const baseCount = mateReplyCount(trigger, category);
   const hasStrongSilentReaction = (post.mateLikes?.length ?? 0) >= 2;
-  if (hasContextReply && Math.random() < 0.72) return Math.max(0, baseCount - 1);
-  if (hasStrongSilentReaction && Math.random() < 0.58) return Math.max(0, baseCount - 1);
+  if (hasContextReply) return Math.random() < 0.12 ? Math.min(1, baseCount) : 0;
+  if (hasStrongSilentReaction && Math.random() < 0.72) return 0;
   return baseCount;
+}
+
+function canAddReplyToPost(posts: TimelinePost[], parentPostId: string, maxReplies = 1) {
+  return posts.filter((post) => post.parentPostId === parentPostId).length < maxReplies;
 }
 
 function staggeredReplyDelay(baseDelayMs: number, index: number) {
@@ -1492,11 +1498,14 @@ function App() {
           parentPostId: parent.id,
           reaction: null,
         };
-        setState((current) => ({
-          ...current,
-          mateAffinity: bumpAffinity(current.mateAffinity, [comment.mateId], AFFINITY_GAIN.progressReply),
-          posts: [reply, ...current.posts],
-        }));
+        setState((current) => {
+          if (!canAddReplyToPost(current.posts, parent.id)) return current;
+          return {
+            ...current,
+            mateAffinity: bumpAffinity(current.mateAffinity, [comment.mateId], AFFINITY_GAIN.progressReply),
+            posts: [reply, ...current.posts],
+          };
+        });
       }, staggeredReplyDelay(0, index));
     });
     setProgressPostedFor(activeSession.id);
@@ -1523,11 +1532,14 @@ function App() {
           parentPostId,
           reaction: null,
         };
-        setState((current) => ({
-          ...current,
-          mateAffinity: bumpAffinity(current.mateAffinity, [comment.mateId], AFFINITY_GAIN.taskReply),
-          posts: [reply, ...current.posts],
-        }));
+        setState((current) => {
+          if (!canAddReplyToPost(current.posts, parentPostId)) return current;
+          return {
+            ...current,
+            mateAffinity: bumpAffinity(current.mateAffinity, [comment.mateId], AFFINITY_GAIN.taskReply),
+            posts: [reply, ...current.posts],
+          };
+        });
       }, staggeredReplyDelay(delayMs, index));
     });
   }
@@ -1544,7 +1556,7 @@ function App() {
     );
     if (pickedReplies.length === 0) return;
     window.setTimeout(() => {
-      const replies: TimelinePost[] = pickedReplies.map((comment) => ({
+      const replies: TimelinePost[] = pickedReplies.slice(0, 1).map((comment) => ({
         id: makeId("post"),
         type: "mate_reply",
         authorId: comment.mateId,
@@ -1555,11 +1567,14 @@ function App() {
         parentPostId: parentPost.id,
         reaction: null,
       }));
-      setState((current) => ({
-        ...current,
-        mateAffinity: bumpAffinity(current.mateAffinity, pickedReplies.map((comment) => comment.mateId), AFFINITY_GAIN.taskReply),
-        posts: [...replies, ...current.posts],
-      }));
+      setState((current) => {
+        if (!canAddReplyToPost(current.posts, parentPost.id) || replies.length === 0) return current;
+        return {
+          ...current,
+          mateAffinity: bumpAffinity(current.mateAffinity, replies.map((reply) => reply.authorId as MateId), AFFINITY_GAIN.taskReply),
+          posts: [...replies, ...current.posts],
+        };
+      });
     }, delayMs);
   }
 
