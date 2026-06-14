@@ -162,6 +162,7 @@ export type AppState = {
   questCompletionLog: QuestCompletionLog[];
   lastNotificationSeenAt?: string;
   introSeenAt?: string;
+  pageGuideSeenAt?: Partial<Record<"quests" | "tickets", string>>;
   tutorialProgress?: TutorialProgress;
   activeSessionId?: string;
   timerMode?: TimerMode;

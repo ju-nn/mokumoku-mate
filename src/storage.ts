@@ -252,6 +252,10 @@ export function normalizeState(parsed: AppState): AppState | null {
       questCompletionLog: Array.isArray(parsed.questCompletionLog) ? parsed.questCompletionLog.map(normalizeQuestCompletionLog) : [],
       lastNotificationSeenAt: typeof parsed.lastNotificationSeenAt === "string" ? parsed.lastNotificationSeenAt : undefined,
       introSeenAt: typeof parsed.introSeenAt === "string" ? parsed.introSeenAt : undefined,
+      pageGuideSeenAt: {
+        quests: typeof parsed.pageGuideSeenAt?.quests === "string" ? parsed.pageGuideSeenAt.quests : undefined,
+        tickets: typeof parsed.pageGuideSeenAt?.tickets === "string" ? parsed.pageGuideSeenAt.tickets : undefined,
+      },
       timerMode: normalizeTimerMode(parsed.timerMode),
       pomodoroCycle: Math.max(1, Math.min(4, Number(parsed.pomodoroCycle) || 1)),
       notificationsEnabled: parsed.notificationsEnabled === true,

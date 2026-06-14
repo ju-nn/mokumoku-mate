@@ -363,6 +363,7 @@ function createInitialState(mode: "tutorial" | "standard" = "tutorial"): AppStat
     questCompletionCount: 0,
     questCompletionLog: [],
     introSeenAt: undefined,
+    pageGuideSeenAt: {},
     timerMode: "free",
     pomodoroCycle: 1,
     notificationsEnabled: false,
@@ -789,6 +790,8 @@ type TicketDraft = {
 };
 
 type ActiveView = "home" | "notifications" | "quests" | "tickets" | "achievements" | "settings";
+
+type PageGuideId = "quests" | "tickets";
 
 type Daypart = "morning" | "day" | "evening" | "night";
 
@@ -1302,6 +1305,7 @@ function App() {
   const [questEditorOpen, setQuestEditorOpen] = useState(false);
   const [ticketEditorOpen, setTicketEditorOpen] = useState(false);
   const [introDialogOpen, setIntroDialogOpen] = useState(false);
+  const [pageGuideOpen, setPageGuideOpen] = useState<PageGuideId | null>(null);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const sidePanelRef = useRef<HTMLElement | null>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
@@ -1604,6 +1608,9 @@ function App() {
   function switchView(view: ActiveView) {
     setActiveView(view);
     window.scrollTo({ top: 0, left: 0 });
+    if ((view === "quests" || view === "tickets") && !state.pageGuideSeenAt?.[view]) {
+      setPageGuideOpen(view);
+    }
     if (view === "notifications") {
       setState((current) => ({ ...current, lastNotificationSeenAt: new Date().toISOString() }));
     }
@@ -1618,6 +1625,19 @@ function App() {
     } else if (view === "settings") {
       setState((current) => completeTutorialStep(current, "settings"));
     }
+  }
+
+  function closePageGuide() {
+    const guideId = pageGuideOpen;
+    setPageGuideOpen(null);
+    if (!guideId) return;
+    setState((current) => ({
+      ...current,
+      pageGuideSeenAt: {
+        ...current.pageGuideSeenAt,
+        [guideId]: new Date().toISOString(),
+      },
+    }));
   }
 
   function openMateProfile(mateId: MateId) {
@@ -2639,6 +2659,7 @@ function App() {
             onStartNewWeek={startNewQuestWeek}
             onStartWeeklyQuestCustomization={startWeeklyQuestCustomization}
             onUndoQuestCompletion={undoQuestCompletion}
+            onOpenGuide={() => setPageGuideOpen("quests")}
             customizingQuestId={customizingQuestId}
             questWeekStartedAt={state.questWeekStartedAt}
             questWeekEndsOn={state.questWeekEndsOn}
@@ -2662,6 +2683,7 @@ function App() {
             onSuggestTicket={addSuggestedTicketDefinition}
             onTicketDraftChange={setTicketDraft}
             onUseTicket={useTicket}
+            onOpenGuide={() => setPageGuideOpen("tickets")}
           />
         )}
 
@@ -2701,6 +2723,9 @@ function App() {
           dismissible={Boolean(state.introSeenAt)}
           onClose={state.introSeenAt ? hideIntroAgain : dismissIntro}
         />
+      )}
+      {pageGuideOpen && (
+        <PageGuideDialog guideId={pageGuideOpen} onClose={closePageGuide} />
       )}
     </main>
   );
@@ -2868,6 +2893,122 @@ function IntroDialog(props: { dismissible: boolean; onClose: () => void }) {
           </div>
         </div>
         <p className="intro-caption">{mate.name}たちが、今日の小さなもくもくを一緒に見守ります。</p>
+      </section>
+    </div>
+  );
+}
+
+const PAGE_GUIDES: Record<PageGuideId, Array<{
+  title: string;
+  body: string;
+  mateId: MateId;
+  points: string[];
+}>> = {
+  quests: [
+    {
+      title: "クエストは今週の小さな約束",
+      body: "思いつく行動を追加するか、おまかせガチャで候補を置きます。数は多くなくて大丈夫です。",
+      mateId: "kamekichi",
+      points: ["追加で自分のクエストを書く", "おまかせガチャで候補を足す", "いらないものは削除してOK"],
+    },
+    {
+      title: "終わったら左の丸を押す",
+      body: "クエストの左にあるチェックボタンが達成ボタンです。押すと完了になり、累計達成数が増えます。",
+      mateId: "usamaru",
+      points: ["左の丸いボタンで達成", "間違えたらキャンセルで戻せる", "達成数がチケット獲得につながる"],
+    },
+    {
+      title: "週が終わったら組み直す",
+      body: "週の締め日を過ぎるとふりかえりが出ます。新しい週にするか、未完了だけ残すかを選べます。",
+      mateId: "kamekichi",
+      points: ["締め日は設定で変更できる", "未完了を残してもいい", "保存済みクエストはあとから戻せる"],
+    },
+  ],
+  tickets: [
+    {
+      title: "チケットは達成のごほうび",
+      body: "クエストを一定数達成すると、設定したチケットが増えます。最初から自分で作っても、候補を足してもOKです。",
+      mateId: "kamekichi",
+      points: ["必要な達成回数を決める", "繰り返し獲得もできる", "今の進み具合が一覧に出る"],
+    },
+    {
+      title: "所持中になったら使える",
+      body: "チケットを獲得すると一覧に所持枚数が出ます。使う時はチケット行の「使う」を押します。",
+      mateId: "usamaru",
+      points: ["所持中のチケットだけ使える", "使うとタイムラインに記録される", "使った分だけ枚数が減る"],
+    },
+    {
+      title: "ごほうびは小さくていい",
+      body: "チケットは自分を釣るためではなく、続いた分をちゃんと回収するためのものです。",
+      mateId: "azamaru",
+      points: ["お金を使わないごほうびでもOK", "休憩や切り上げもチケットになる", "無理なく続く条件に調整する"],
+    },
+  ],
+};
+
+function PageGuideDialog(props: { guideId: PageGuideId; onClose: () => void }) {
+  const slides = PAGE_GUIDES[props.guideId];
+  const [slideIndex, setSlideIndex] = useState(0);
+  const slide = slides[slideIndex];
+  const mate = mates[slide.mateId];
+  const isLast = slideIndex === slides.length - 1;
+
+  return (
+    <div className="modal-backdrop intro-backdrop" role="presentation" onClick={props.onClose}>
+      <section
+        aria-labelledby="page-guide-title"
+        aria-modal="true"
+        className="intro-dialog"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <button className="intro-close" onClick={props.onClose} type="button" aria-label="使い方を閉じる">
+          閉じる
+        </button>
+        <div className="intro-slide-window">
+          <article className="intro-slide">
+            <AvatarImage className="intro-dialog-mate" imageSrc={mate.imageSrc} name={mate.name} />
+            <div className="intro-copy">
+              <span>{props.guideId === "quests" ? "クエストの使い方" : "チケットの使い方"}</span>
+              <h2 id="page-guide-title">{slide.title}</h2>
+              <p>{slide.body}</p>
+            </div>
+            <div className="intro-point-list">
+              {slide.points.map((point) => (
+                <div className="intro-point" key={point}>
+                  <CheckIcon />
+                  <span>{point}</span>
+                </div>
+              ))}
+            </div>
+          </article>
+        </div>
+        <div className="intro-footer">
+          <div className="intro-progress" aria-label={`使い方 ${slideIndex + 1} / ${slides.length}`}>
+            {slides.map((item, index) => (
+              <button
+                aria-label={`${item.title}を見る`}
+                className={index === slideIndex ? "selected" : ""}
+                key={item.title}
+                onClick={() => setSlideIndex(index)}
+                type="button"
+              />
+            ))}
+          </div>
+          <div className="intro-actions">
+            <button className="soft-button" disabled={slideIndex === 0} onClick={() => setSlideIndex((index) => Math.max(0, index - 1))} type="button">
+              戻る
+            </button>
+            <button
+              className="soft-button strong"
+              onClick={isLast ? props.onClose : () => setSlideIndex((index) => Math.min(slides.length - 1, index + 1))}
+              type="button"
+            >
+              {isLast ? "はじめる" : "次へ"}
+            </button>
+          </div>
+        </div>
+        <p className="intro-caption">{mate.name}が、操作の入口だけ案内します。</p>
       </section>
     </div>
   );
@@ -3106,6 +3247,7 @@ function QuestPage(props: {
   onStartNewWeek: (carryOpen: boolean) => void;
   onStartWeeklyQuestCustomization: (quest: WeeklyQuest) => void;
   onUndoQuestCompletion: (questId: string) => void;
+  onOpenGuide: () => void;
   customizingQuestId: string | null;
   questWeekStartedAt: string;
   questWeekEndsOn: Weekday;
@@ -3130,6 +3272,9 @@ function QuestPage(props: {
           <h2>クエストボード</h2>
           <p>今週やることを、好きな数だけ並べます。</p>
         </div>
+        <button className="soft-button" onClick={props.onOpenGuide} type="button">
+          使い方
+        </button>
         <div className="quest-summary">
           <strong>{props.weeklyQuests.length}</strong>
           <span>今週のクエスト</span>
@@ -3363,6 +3508,7 @@ function TicketPage(props: {
   onSuggestTicket: () => void;
   onTicketDraftChange: (draft: TicketDraft) => void;
   onUseTicket: (ticketId: string) => void;
+  onOpenGuide: () => void;
 }) {
   const completedThisWeek = props.weeklyQuests.filter((quest) => quest.completedAt).length;
   const enabledTickets = props.ticketDefinitions.filter((ticket) => ticket.enabled);
@@ -3380,6 +3526,9 @@ function TicketPage(props: {
           <h2>ごほうびチケット</h2>
           <p>チケットも自分で決めます。思いつかない時だけ候補を足せます。</p>
         </div>
+        <button className="soft-button" onClick={props.onOpenGuide} type="button">
+          使い方
+        </button>
         <div className="quest-summary">
           <strong>{totalOwned}</strong>
           <span>所持チケット</span>
