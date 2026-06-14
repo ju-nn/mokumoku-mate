@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="16" fill="#eff8f1"/>
-  <path d="M16 38c0-13 8-22 20-22 8 0 15 5 17 13 3 12-6 24-21 24-10 0-16-5-16-15Z" fill="#fff" stroke="#4f9b70" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M19 23c4-8 13-11 23-7" fill="none" stroke="#e7ad62" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="28" cy="34" r="3" fill="#2d744f"/>
-  <circle cx="42" cy="34" r="3" fill="#2d744f"/>
-  <path d="M29 43c4 3 9 3 13 0" fill="none" stroke="#2d744f" stroke-width="3" stroke-linecap="round"/>
+  <rect width="64" height="64" rx="16" fill="#2d744f"/>
+  <circle cx="32" cy="32" r="22" fill="#eff8f1"/>
+  <path d="M19 22c7-8 19-9 28-2" fill="none" stroke="#e7ad62" stroke-width="5" stroke-linecap="round"/>
+  <text x="32" y="43" text-anchor="middle" font-family="'Yu Gothic', 'Hiragino Sans', sans-serif" font-size="34" font-weight="800" fill="#2d744f">も</text>
 </svg>
