@@ -18,6 +18,7 @@ import type {
   MateId,
   MonologueKind,
   PomodoroPhase,
+  QuestCompletionLog,
   QuestTemplate,
   TaskCategory,
   TaskResult,
@@ -395,7 +396,8 @@ function pickComments(
       comment.postType === "mate_reply" &&
       (!options.replyToMateId || comment.replyToMateId === options.replyToMateId) &&
       (!comment.category || comment.category === category) &&
-      !excludeMateIds.has(comment.mateId),
+      !excludeMateIds.has(comment.mateId) &&
+      !recentTexts.has(comment.text),
   ).filter(
     (comment) => (comment.minAffinity ?? 0) <= (affinity[comment.mateId] ?? 0),
   );
@@ -408,7 +410,6 @@ function pickComments(
         Math.random() +
         (options.replyToMateId && itemMatchesReplyTarget(comment, options.replyToMateId) ? 4 : 0) +
         (comment.category === category ? 2 : 0) -
-        (recentTexts.has(comment.text) ? 6 : 0) -
         (recentMateIds.includes(comment.mateId) ? 0.6 : 0) +
         Math.min(1.1, (affinity[comment.mateId] ?? 0) / 18),
     }))
@@ -919,9 +920,42 @@ function makeWeeklyQuest(template: QuestTemplate): WeeklyQuest {
   };
 }
 
-function pickQuestReaction(quest: WeeklyQuest) {
+function shouldPostQuestMilestone(completedCount: number) {
+  return completedCount === 1 || completedCount % 5 === 0;
+}
+
+function shouldPostTicketUseMilestone(usedCount: number) {
+  return usedCount === 1 || usedCount % 3 === 0;
+}
+
+function countUsedTickets(
+  inventory: AppState["ticketInventory"],
+  awardedCounts: AppState["ticketAwardedCounts"],
+) {
+  return Object.entries(awardedCounts).reduce((sum, [ticketId, awardedCount]) => (
+    sum + Math.max(0, awardedCount - (inventory[ticketId] ?? 0))
+  ), 0);
+}
+
+function pickQuestReaction(quest: WeeklyQuest, completedCount: number) {
   const mateId: MateId = "kamekichi";
-  return { mateId, text: `「${quest.title}」できたねぇ。ゆっくり進めばええよぉ。` };
+  if (completedCount === 1) {
+    return {
+      mateId,
+      text: pickOne([
+        `初めてのクエスト達成やねぇ。「${quest.title}」がちゃんと記録に残ったよぉ。`,
+        `最初のクエスト、できたねぇ。小さくても、ここから道ができていくんやでぇ。`,
+      ]),
+    };
+  }
+  return {
+    mateId,
+    text: pickOne([
+      `クエスト達成が${completedCount}件になったねぇ。急がんでも、積み上がった跡は残るんやでぇ。`,
+      `${completedCount}件目のクエスト達成やねぇ。ここまで戻ってきた回数、ちゃんと見えてるよぉ。`,
+      `クエスト${completedCount}件、静かに積み上がってきたねぇ。今日はその分を少し眺めてもええよぉ。`,
+    ]),
+  };
 }
 
 function nextTicketProgress(definition: TicketDefinition, completedCount: number) {
@@ -2042,24 +2076,6 @@ function App() {
     }
   }
 
-  function addMonologue() {
-    const monologues = getUnusedMonologueComments(state.posts);
-    const comment = monologues[Math.floor(Math.random() * monologues.length)];
-    if (!comment) return;
-    const addedPost: TimelinePost = {
-      id: makeId("post"),
-      type: "mate_monologue",
-      authorId: comment.mateId,
-      text: comment.text,
-      createdAt: new Date().toISOString(),
-      taskCategory: comment.category,
-      reaction: null,
-      mateLikes: maybePeerLikes(comment.mateId, comment.category, state.posts),
-    };
-    setState((current) => ({ ...current, posts: [addedPost, ...current.posts] }));
-    if (addedPost) queueMateThreadReplies(addedPost);
-  }
-
   function fillWeeklyQuests() {
     setState((current) => {
       const usedTitles = new Set(current.weeklyQuests.map((quest) => quest.title));
@@ -2171,20 +2187,26 @@ function App() {
   function completeQuest(questId: string) {
     const quest = state.weeklyQuests.find((item) => item.id === questId);
     if (!quest || quest.completedAt) return;
-    const reaction = pickQuestReaction(quest);
-    const reactionPost: TimelinePost = {
-      id: makeId("post"),
-      type: "mate_monologue",
-      authorId: reaction.mateId,
-      text: reaction.text,
-      createdAt: new Date().toISOString(),
-      reaction: null,
-      mateLikes: maybePeerLikes(reaction.mateId, undefined, state.posts, 0.28),
-    };
+    let reactionPostToQueue: TimelinePost | null = null;
 
     setState((current) => {
+      const target = current.weeklyQuests.find((item) => item.id === questId);
+      if (!target || target.completedAt) return current;
       const previousCount = current.questCompletionCount ?? 0;
       const nextCount = previousCount + 1;
+      const reaction = shouldPostQuestMilestone(nextCount) ? pickQuestReaction(target, nextCount) : null;
+      const reactionPost: TimelinePost | null = reaction
+        ? {
+            id: makeId("post"),
+            type: "mate_monologue",
+            authorId: reaction.mateId,
+            text: reaction.text,
+            createdAt: new Date().toISOString(),
+            reaction: null,
+            mateLikes: maybePeerLikes(reaction.mateId, undefined, current.posts, 0.28),
+          }
+        : null;
+      reactionPostToQueue = reactionPost;
       const ticketInventory = { ...current.ticketInventory };
       const ticketAwardedCounts = { ...current.ticketAwardedCounts };
       const awardedNames: string[] = [];
@@ -2219,21 +2241,21 @@ function App() {
         questCompletionLog: [
           {
             id: makeId("quest-log"),
-            questId: quest.id,
-            title: quest.title,
-            source: quest.source,
+            questId: target.id,
+            title: target.title,
+            source: target.source,
             completedAt: new Date().toISOString(),
           },
           ...(current.questCompletionLog ?? []),
         ],
-        mateAffinity: bumpAffinity(current.mateAffinity, [reaction.mateId], AFFINITY_GAIN.questCompletion),
+        mateAffinity: reaction ? bumpAffinity(current.mateAffinity, [reaction.mateId], AFFINITY_GAIN.questCompletion) : current.mateAffinity,
         weeklyQuests: current.weeklyQuests.map((item) =>
           item.id === questId ? { ...item, completedAt: new Date().toISOString() } : item,
         ),
-        posts: [reactionPost, ...current.posts],
+        posts: reactionPost ? [reactionPost, ...current.posts] : current.posts,
       };
     });
-    queueMateThreadReplies(reactionPost, 7000);
+    if (reactionPostToQueue) queueMateThreadReplies(reactionPostToQueue, 7000);
   }
 
   function replaceWeeklyQuest(questId: string) {
@@ -2429,25 +2451,36 @@ function App() {
     const ticket = state.ticketDefinitions.find((item) => item.id === ticketId);
     if (!ticket || (state.ticketInventory[ticketId] ?? 0) <= 0) return;
     const mateId: MateId = "kamekichi";
-    const post: TimelinePost = {
-      id: makeId("post"),
-      type: "mate_monologue",
-      authorId: mateId,
-      text: makeTicketUsePostText(ticket),
-      createdAt: new Date().toISOString(),
-      reaction: null,
-      mateLikes: maybePeerLikes(mateId, undefined, state.posts, 0.26),
-    };
+    let postToQueue: TimelinePost | null = null;
     setLatestReward(`${ticket.name}を使いました。`);
-    setState((current) => ({
-      ...current,
-      ticketInventory: {
-        ...current.ticketInventory,
-        [ticketId]: Math.max(0, (current.ticketInventory[ticketId] ?? 0) - 1),
-      },
-      posts: [post, ...current.posts],
-    }));
-    queueMateThreadReplies(post, 7000);
+    setState((current) => {
+      const currentTicket = current.ticketDefinitions.find((item) => item.id === ticketId);
+      const currentCount = current.ticketInventory[ticketId] ?? 0;
+      if (!currentTicket || currentCount <= 0) return current;
+      const nextUsedCount = countUsedTickets(current.ticketInventory, current.ticketAwardedCounts) + 1;
+      const shouldPostUse = shouldPostTicketUseMilestone(nextUsedCount);
+      const post: TimelinePost | null = shouldPostUse
+        ? {
+            id: makeId("post"),
+            type: "mate_monologue",
+            authorId: mateId,
+            text: makeTicketUsePostText(currentTicket),
+            createdAt: new Date().toISOString(),
+            reaction: null,
+            mateLikes: maybePeerLikes(mateId, undefined, current.posts, 0.26),
+          }
+        : null;
+      postToQueue = post;
+      return {
+        ...current,
+        ticketInventory: {
+          ...current.ticketInventory,
+          [ticketId]: Math.max(0, currentCount - 1),
+        },
+        posts: post ? [post, ...current.posts] : current.posts,
+      };
+    });
+    if (postToQueue) queueMateThreadReplies(postToQueue, 7000);
   }
 
   function updateSessionRecord(sessionId: string, nextCategory: TaskCategory, nextResult: TaskResult) {
@@ -2531,7 +2564,6 @@ function App() {
     if (countDiff !== 0) return countDiff;
     return categories.findIndex((item) => item.id === a.id) - categories.findIndex((item) => item.id === b.id);
   });
-  const hasUnusedMonologue = getUnusedMonologueComments(state.posts).length > 0;
   const nextTutorialStepId = tutorialProgress.finishedAt ? null : getNextTutorialStepId(tutorialProgress);
 
   return (
@@ -2569,20 +2601,6 @@ function App() {
         {activeView === "home" && (
           <section className="workspace">
             <section className="timeline-section" aria-label="プライベートタイムライン">
-              <div className="section-heading">
-                <div>
-                  <h2>
-                    <span className="heading-mark" aria-hidden="true" />
-                    みんなのもくもくタイムライン
-                  </h2>
-                  <p>メイトの投稿と作業記録を表示します。</p>
-                </div>
-                {hasUnusedMonologue && (
-                  <button className="ghost-button" onClick={addMonologue} type="button">
-                    投稿を表示
-                  </button>
-                )}
-              </div>
               <div className="timeline">
                 {timelineRows.map((row) => row.type === "date" ? (
                   <div className="timeline-date-separator" role="separator" key={`date-${row.key}`}>
@@ -2690,6 +2708,7 @@ function App() {
         {activeView === "achievements" && (
           <AchievementPage
             mateAffinity={state.mateAffinity}
+            questCompletionLog={state.questCompletionLog}
             sessions={state.sessions}
             onDeleteSession={deleteSessionRecord}
             onEditSession={updateSessionRecord}
@@ -3471,7 +3490,7 @@ function QuestPage(props: {
                   if (event.key !== "Enter") return;
                   props.customizingQuestId ? props.onSaveWeeklyQuestCustomization() : props.onSaveQuest();
                 }}
-                placeholder="例: 猫の水皿を洗う"
+                placeholder="例: 毎日10回、腕立て伏せをする。"
                 value={props.questDraft.title}
               />
               <div className="form-actions">
@@ -3623,12 +3642,12 @@ function TicketPage(props: {
             <div className="inline-form roomy">
               <input
                 onChange={(event) => props.onTicketDraftChange({ ...props.ticketDraft, name: event.target.value })}
-                placeholder="例: アイスチケット"
+                placeholder="例: 日帰り旅行チケット"
                 value={props.ticketDraft.name}
               />
               <input
                 onChange={(event) => props.onTicketDraftChange({ ...props.ticketDraft, description: event.target.value })}
-                placeholder="例: コンビニアイス1個OK"
+                placeholder="例: 近場へ出かける予定を立てる"
                 value={props.ticketDraft.description}
               />
               <label className="field-label">
@@ -3668,6 +3687,7 @@ function TicketPage(props: {
 
 function AchievementPage(props: {
   mateAffinity: AppState["mateAffinity"];
+  questCompletionLog: QuestCompletionLog[];
   sessions: TaskSession[];
   onDeleteSession: (sessionId: string) => void;
   onEditSession: (sessionId: string, category: TaskCategory, result: TaskResult) => void;
@@ -3683,31 +3703,40 @@ function AchievementPage(props: {
   type DayActivity = {
     count: number;
     categories: Record<TaskCategory, number>;
-    entries: { title: string; category: TaskCategory; date: Date }[];
+    questCount: number;
+    entries: { title: string; category?: TaskCategory; date: Date }[];
   };
   const activityByDate = new Map<string, DayActivity>();
   const addActivity = (
     dateLike: string | undefined,
-    category: TaskCategory,
     title: string,
+    category?: TaskCategory,
   ) => {
     if (!dateLike) return;
     const key = toDateKey(dateLike);
     const current = activityByDate.get(key) ?? {
       count: 0,
       categories: makeDefaultCategoryUseCounts(),
+      questCount: 0,
       entries: [],
     };
     current.count += 1;
-    current.categories[category] = (current.categories[category] ?? 0) + 1;
+    if (category) {
+      current.categories[category] = (current.categories[category] ?? 0) + 1;
+    } else {
+      current.questCount += 1;
+    }
     current.entries.push({ title, category, date: new Date(dateLike) });
     activityByDate.set(key, current);
   };
 
   for (const session of props.sessions) {
     if (session.endedAt && session.result) {
-      addActivity(session.endedAt, session.category, `${categoryLabel(session.category)} ${resultLabels[session.result]}`);
+      addActivity(session.endedAt, `${categoryLabel(session.category)} ${resultLabels[session.result]}`, session.category);
     }
+  }
+  for (const quest of props.questCompletionLog) {
+    addActivity(quest.completedAt, `クエスト ${quest.title}`);
   }
 
   const today = new Date();
@@ -3728,6 +3757,7 @@ function AchievementPage(props: {
     const activity = activityByDate.get(key) ?? {
       count: 0,
       categories: makeDefaultCategoryUseCounts(),
+      questCount: 0,
       entries: [],
     };
     return {
@@ -3860,6 +3890,15 @@ function AchievementPage(props: {
                         />
                       );
                     })}
+                    {day.questCount > 0 && (
+                      <i
+                        key="quest"
+                        style={{
+                          background: mates.kamekichi.accent,
+                          width: `${Math.min(100, 24 + day.questCount * 22)}%`,
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               );
@@ -3875,6 +3914,10 @@ function AchievementPage(props: {
                 </span>
               );
             })}
+            <span>
+              <i style={{ background: mates.kamekichi.accent }} />
+              クエスト
+            </span>
           </div>
         </section>
 

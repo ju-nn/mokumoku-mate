@@ -196,20 +196,10 @@ h1 {
 
 .timeline-section {
   min-width: 0;
-  padding: 22px 0 0;
+  padding: 0;
   overflow: visible;
 }
 
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  margin: 0 0 20px;
-  padding: 0 14px;
-}
-
-.section-heading h2,
 .start-title,
 .result-panel h2 {
   display: flex;
@@ -230,33 +220,11 @@ h1 {
   box-shadow: 0 0 0 3px #eef8f1;
 }
 
-.section-heading p {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.ghost-button {
-  min-height: 34px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  color: var(--green-dark);
-  background: transparent;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.ghost-button:hover {
-  background: var(--soft-green);
-}
-
 .timeline {
   display: grid;
   gap: 0;
   overflow: hidden;
-  border-top: 1px solid var(--border);
-  border-radius: 0 0 8px 8px;
+  border-radius: 8px;
 }
 
 .post {
